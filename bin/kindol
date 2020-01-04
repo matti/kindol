@@ -52,6 +52,9 @@ helm NAME <helm args>
 kubectl|k NAME <kubectl args>
   use kubectl with the correct kubeconfig
 
+stats
+  see docker stats for the cluster
+
 version
   prints kindol version
 
@@ -189,6 +192,10 @@ nodes:
 
   proxy:show)
     docker ps -f name=kindolproxy-$name
+  ;;
+
+  stats)
+    docker stats kindol-$name-control-plane
   ;;
 
   k|kubectl)

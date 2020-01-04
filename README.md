@@ -115,6 +115,9 @@ helm NAME <helm args>
 kubectl|k NAME <kubectl args>
   use kubectl with the correct kubeconfig
 
+stats
+  see docker stats for the cluster
+
 version|--version
   prints kindol version
 
