@@ -43,7 +43,7 @@ proxy:enable NAME [--publish=127.0.0.1:80:80 --publish=127.0.0.1:443:443]
 proxy:disable NAME
   disables the proxy
 
-proxy:show
+proxy:show NAME
   shows the current proxy if enabled
 
 helm NAME <helm args>
