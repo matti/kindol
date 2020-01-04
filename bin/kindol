@@ -75,16 +75,6 @@ name="${2:-}"
 KUBECONFIG="$HOME/.kube/kindol-$name"
 
 case "$command" in
-  start)
-    >/dev/null 2>&1 docker start "kindol-$name-control-plane"
-    >/dev/null 2>&1 docker start "kindolproxy-$name" || true
-    echo "started"
-  ;;
-  stop)
-    >/dev/null 2>&1 docker stop "kindolproxy-$name" || true
-    >/dev/null docker stop "kindol-$name-control-plane"
-    echo "stoppped"
-  ;;
   create|delete)
     case "$command" in
       create)
