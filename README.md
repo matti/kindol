@@ -79,6 +79,24 @@ ln -s $(pwd)/bin/kindol /usr/local/bin
 ```
 
 ## usage
+
+requires:
+  - kind
+    ```
+    asdf plugin-add kind https://github.com/matti/asdf-kind.git
+    asfd install kind 0.6.1
+    ```
+  - helm3
+    ```
+    asdf plugin-add helm https://github.com/Antiarchitect/asdf-helm.git
+    asdf install helm 3.0.2
+    ```
+  - kubectl
+    ```
+    asdf plugin-add kubectl https://github.com/Banno/asdf-kubectl.git
+    asdf install kubectl <desired>
+    ```
+
 ```
 USAGE: kindol COMMAND [ARG] [--opt=value]
 
