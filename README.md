@@ -117,4 +117,7 @@ kubectl|k NAME <kubectl args>
 
 version|--version
   prints kindol version
+
+usage|help
+  this text
 ```
