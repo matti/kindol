@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+_err() {
+  >&2 echo "err: $*"
+  exit 1
+}
+
+command="${1:-}"
+
+clusterCommand=false
+case "$command" in
+  list)
+    docker ps -f name=kindol-
+  ;;
+  version|--version)
+    echo "0.0.1"
+  ;;
+  ""|usage|help)
+    echo """USAGE: kindol COMMAND [ARG] [--opt=value]
+
+list
+  lists all kind clusters
+
+create NAME [--publish=]
+  creates a kind cluster
+
+  use --publish=80:80 to permanently pubish port 80 from the control-plane
+    (see proxy:enable for dynamic publish)
+
+delete NAME
+  deletes a kind cluster
+
+ingress:enable NAME [--http=80 --https=443]
+  installs ingress-nginx with helm as DaemonSet using hostPorts
+
+ingress:disable NAME
+  uninstalls ingress-nginx
+
+proxy:enable NAME [--publish=127.0.0.1:80:80 --publish=127.0.0.1:443:443]
+  publishes ports from the control-plane to the host
+
+proxy:disable NAME
+  disables the proxy
+
+proxy:show
+  shows the current proxy if enabled
+
+helm NAME <helm args>
+  use helm with the correct kubeconfig
+
+kubectl|k NAME <kubectl args>
+  use kubectl with the correct kubeconfig
+
+version
+  prints kindol version
+
+usage|help
+  this text
+"""
+  ;;
+  *)
+    clusterCommand=true
+  ;;
+esac
+
+[ $clusterCommand = false ] && exit 0
+
+name="${2:-}"
+[ "$name" = "" ] && _err "name missing"
+
+KUBECONFIG="$HOME/.kube/kindol-$name"
+
+case "$command" in
+  start)
+    >/dev/null 2>&1 docker start "kindol-$name-control-plane"
+    >/dev/null 2>&1 docker start "kindolproxy-$name" || true
+    echo "started"
+  ;;
+  stop)
+    >/dev/null 2>&1 docker stop "kindolproxy-$name" || true
+    >/dev/null docker stop "kindol-$name-control-plane"
+    echo "stoppped"
+  ;;
+  create|delete)
+    case "$command" in
+      create)
+        extraPortMappings=""
+        for arg in "${@:3}"; do
+          case $arg in
+            -p=*|--publish=*)
+              ports=${arg#*=}
+              extraPortMappings="$extraPortMappings\n  - containerPort: ${ports%:*}"
+              extraPortMappings="$extraPortMappings\n    hostPort: ${ports#*:}"
+            ;;
+          esac
+        done
+
+        config="""kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings: $extraPortMappings
+"""
+        printf "$config"
+        echo ""
+        printf "$config" | kind create cluster --name "kindol-$name" --config=-
+      ;;
+      delete)
+        kind delete cluster --name "kindol-$name"
+      ;;
+    esac
+  ;;
+
+  ingress:enable)
+    httpPort=80
+    httpsPort=443
+
+    for arg in "${@:3}"; do
+      case $arg in
+        --http=*)
+          httpPort=${arg#*=}
+        ;;
+        --https=*)
+          httpsPort=${arg#*=}
+        ;;
+      esac
+    done
+
+    values="""controller:
+  kind: DaemonSet
+  daemonset:
+    useHostPort: true
+    hostPorts:
+      http: $httpPort
+      https: $httpsPort
+  service:
+    enabled: false
+"""
+    echo "installing nginx-ingress with values:"
+    printf "$values"
+
+    # https://github.com/helm/helm/issues/7002
+    if [ "$(helm list --filter=ingress -q)" = "" ]; then
+      printf "$values" | helm install --values - ingress stable/nginx-ingress
+    else
+      printf "$values" | helm upgrade --values - ingress stable/nginx-ingress
+    fi
+  ;;
+
+  ingress:disable)
+    helm del ingress
+  ;;
+
+  proxy:enable)
+    >/dev/null $0 proxy:disable $name
+
+    defaultPublish="--publish 127.0.0.1:80:80 --publish 127.0.0.1:443:443"
+    publish=""
+    for arg in "${@:3}"; do
+      case $arg in
+        --publish=*)
+          publish="$publish$arg "
+        ;;
+      esac
+    done
+    [ "$publish" = "" ] && publish="$defaultPublish"
+
+    controlPlaneIp=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "kindol-$name-control-plane")
+
+    echo "starting proxy of kindol-$name-control-plane with $publish"
+
+    >/dev/null docker run -d --name "kindolproxy-$name" \
+      $publish \
+      alpine/socat -dd \
+      tcp-listen:80,fork,reuseaddr tcp-connect:$controlPlaneIp:80
+  ;;
+
+  proxy:disable)
+    disabled=false
+    >/dev/null 2>&1 docker rm -f "kindolproxy-$name" && disabled=true
+
+    if [ "$disabled" = true ]; then
+      echo "proxy disabled"
+    else
+      echo "proxy is not running"
+    fi
+  ;;
+
+  proxy:show)
+    docker ps -f name=kindolproxy-$name
+  ;;
+
+  k|kubectl)
+    kubectl "${@:3}"
+  ;;
+
+  helm)
+    helm "${@:3}"
+  ;;
+
+  *)
+    $0 usage
+    exit 1
+  ;;
+esac
