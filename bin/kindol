@@ -14,7 +14,7 @@ case "$command" in
     docker ps -f name=kindol-
   ;;
   version|--version)
-    echo "0.1.0"
+    echo "0.1.2"
   ;;
   ""|usage|help)
     echo """USAGE: kindol COMMAND [ARG] [--opt=value]
