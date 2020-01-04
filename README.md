@@ -142,3 +142,8 @@ version|--version
 usage|help
   this text
 ```
+
+# related
+- https://github.com/matti/k3dolan
+- https://github.com/matti/k3sup-multipass
+
